@@ -86,14 +86,14 @@ html.lenis body {
   to { transform: rotate(360deg); }
 }
 
-/* hide nav + black page before intro hydrates */
-html.intro-playing header {
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
+/* black out everything before intro hydrates */
 html.intro-playing body {
   background: #000 !important;
   overflow: hidden;
+}
+html.intro-playing body > * {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* custom scrollbar */

@@ -2,7 +2,8 @@ import "./globals.css";
 import { Inter } from "next/font/google";
 import SmoothScroll from "../components/SmoothScroll";
 import ScrollProgress from "../components/ScrollProgress";
-import Nav from "../components/Nav";
+import dynamic from "next/dynamic";
+const Nav = dynamic(() => import("../components/Nav"), { ssr: false });
 import Footer from "../components/Footer";
 import Cursor from "../components/Cursor";
 
