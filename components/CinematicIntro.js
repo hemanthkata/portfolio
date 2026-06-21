@@ -6,23 +6,23 @@ import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import * as THREE from "three";
-import NameReveal from "./NameReveal";
 
 /* ---------- timeline (seconds) ---------- */
 const T = {
-  reveal: 2.0,   // stars + vortex fade in
-  spiral: 3.5,   // vortex starts accelerating inward
-  freeze: 8.0,   // singularity explodes
+  reveal:   2.0,  // stars + vortex fade in
+  spiral:   3.5,  // vortex accelerates inward
+  freeze:   8.0,  // singularity explodes
   assemble: 10.5, // particles form HK
-  lift: 11.7,    // HK particles move up
-  expand: 13.6,  // particles extend into "Hemanth Kata"
+  lift:     11.7, // HK lifts up
+  expand:   13.2, // HK particles split → Hemanth Kata
+  settle:   16.0, // name fully formed
 };
 
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
-const smooth = (x) => { x = clamp01(x); return x * x * (3 - 2 * x); };
-const lerp = (a, b, t) => a + (b - a) * t;
+const smooth  = (x) => { x = clamp01(x); return x * x * (3 - 2 * x); };
+const lerp    = (a, b, t) => a + (b - a) * t;
 
-/* ---------- sample "HK" into 3D target points ---------- */
+/* ---------- sample text into 3D particle targets ---------- */
 function sampleTextTargets(text, count, worldW) {
   const fontPx = 200;
   const pad = 24;
@@ -32,15 +32,12 @@ function sampleTextTargets(text, count, worldW) {
   const tw = Math.ceil(ctx.measureText(text).width);
   const W = tw + pad * 2;
   const H = fontPx + pad * 2;
-  c.width = W;
-  c.height = H;
+  c.width = W; c.height = H;
   ctx = c.getContext("2d");
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = "#fff";
   ctx.font = `bold ${fontPx}px Arial, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(text, W / 2, H / 2);
   const data = ctx.getImageData(0, 0, W, H).data;
   const pts = [];
@@ -53,12 +50,12 @@ function sampleTextTargets(text, count, worldW) {
     const p = pts.length ? pts[(Math.random() * pts.length) | 0] : [W / 2, H / 2];
     targets[i * 3]     = (p[0] - W / 2) * scale;
     targets[i * 3 + 1] = -(p[1] - H / 2) * scale;
-    targets[i * 3 + 2] = (Math.random() - 0.5) * 0.35;
+    targets[i * 3 + 2] = (Math.random() - 0.5) * 0.3;
   }
   return targets;
 }
 
-/* ---------- galaxy vortex → singularity → HK sequence ---------- */
+/* ---------- galaxy vortex → singularity → HK → Hemanth Kata ---------- */
 function Sequence() {
   const { camera } = useThree();
   const t0 = useRef(null);
@@ -72,21 +69,21 @@ function Sequence() {
   const points    = useRef();
   const exploded  = useRef(false);
 
-  /* per-particle mutable state stored in refs */
   const vAngles = useRef(null);
-  const vRadii0 = useRef(null); // initial radii (never changes)
+  const vRadii0 = useRef(null);
   const vSpeeds = useRef(null);
-  const vYs0    = useRef(null); // initial y (never changes)
+  const vYs0    = useRef(null);
 
-  const N = 5000; // HK particles
-  const V = 3500; // vortex particles
+  const N = 5000;
+  const V = 3500;
 
-  /* HK particle geometry */
-  const { positions, origins, dirs, hkTargets } = useMemo(() => {
-    const hkTargets = sampleTextTargets("HK", N, 3.6);
-    const positions = new Float32Array(N * 3);
-    const origins   = new Float32Array(N * 3);
-    const dirs      = new Float32Array(N * 3);
+  /* particle geometry + both text targets */
+  const { positions, origins, dirs, hkTargets, nameTargets } = useMemo(() => {
+    const hkTargets   = sampleTextTargets("HK", N, 3.6);
+    const nameTargets = sampleTextTargets("Hemanth Kata", N, 8.5);
+    const positions   = new Float32Array(N * 3);
+    const origins     = new Float32Array(N * 3);
+    const dirs        = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) {
       const dv = new THREE.Vector3(
         Math.random() * 2 - 1,
@@ -97,10 +94,10 @@ function Sequence() {
       origins[i*3]=dv.x*0.4; origins[i*3+1]=dv.y*0.4; origins[i*3+2]=dv.z*0.4;
       positions[i*3]=origins[i*3]; positions[i*3+1]=origins[i*3+1]; positions[i*3+2]=origins[i*3+2];
     }
-    return { positions, origins, dirs, hkTargets };
+    return { positions, origins, dirs, hkTargets, nameTargets };
   }, []);
 
-  /* Galaxy vortex initial layout — disk with arm-like density */
+  /* galaxy vortex */
   const vortexInitPos = useMemo(() => {
     const angles = new Float32Array(V);
     const radii  = new Float32Array(V);
@@ -110,33 +107,24 @@ function Sequence() {
     for (let i = 0; i < V; i++) {
       const r     = 1.2 + Math.pow(Math.random(), 0.6) * 7.0;
       const angle = Math.random() * Math.PI * 2;
-      /* slight spiral-arm offset so it looks like a galaxy */
-      const armOffset = (r / 8) * 1.2;
-      const a = angle + armOffset;
-      const y = (Math.random() - 0.5) * 1.0 * (1 - r / 9);
-      angles[i] = a;
-      radii[i]  = r;
-      speeds[i] = (0.15 + Math.random() * 0.35) / Math.sqrt(r); // Keplerian-ish
-      ys[i]     = y;
-      pos[i*3]   = Math.cos(a) * r;
-      pos[i*3+1] = y;
-      pos[i*3+2] = Math.sin(a) * r;
+      const a     = angle + (r / 8) * 1.2;
+      const y     = (Math.random() - 0.5) * 1.0 * (1 - r / 9);
+      angles[i] = a; radii[i] = r;
+      speeds[i] = (0.15 + Math.random() * 0.35) / Math.sqrt(r);
+      ys[i] = y;
+      pos[i*3]=Math.cos(a)*r; pos[i*3+1]=y; pos[i*3+2]=Math.sin(a)*r;
     }
-    vAngles.current = angles;
-    vRadii0.current = radii;
-    vSpeeds.current = speeds;
-    vYs0.current    = ys;
+    vAngles.current = angles; vRadii0.current = radii;
+    vSpeeds.current = speeds; vYs0.current    = ys;
     return pos;
   }, []);
 
-  /* Star field */
+  /* star field */
   const starPositions = useMemo(() => {
-    const M = 2000;
-    const a = new Float32Array(M * 3);
+    const M = 2000; const a = new Float32Array(M * 3);
     for (let i = 0; i < M; i++) {
-      a[i*3]   = (Math.random() - 0.5) * 80;
-      a[i*3+1] = (Math.random() - 0.5) * 80;
-      a[i*3+2] = -15 - Math.random() * 50;
+      a[i*3]=(Math.random()-0.5)*80; a[i*3+1]=(Math.random()-0.5)*80;
+      a[i*3+2]=-15-Math.random()*50;
     }
     return a;
   }, []);
@@ -146,29 +134,24 @@ function Sequence() {
     const t  = state.clock.elapsedTime - t0.current;
     const et = state.clock.elapsedTime;
 
-    /* stars fade in */
     if (starsMat.current) starsMat.current.opacity = smooth(t / T.reveal) * 0.85;
 
     let liftY = 0;
 
     if (t < T.freeze) {
-      /* ---- vortex phase ---- */
+      /* vortex spin + inward collapse */
       if (vortexRef.current && vAngles.current) {
-        const arr = vortexRef.current.geometry.attributes.position.array;
+        const arr     = vortexRef.current.geometry.attributes.position.array;
         const spiralP = t < T.spiral ? 0 : smooth((t - T.spiral) / (T.freeze - T.spiral));
-
         for (let i = 0; i < V; i++) {
-          const speed = vSpeeds.current[i] * (1 + spiralP * 14);
-          vAngles.current[i] += delta * speed;
+          vAngles.current[i] += delta * vSpeeds.current[i] * (1 + spiralP * 14);
           const r = vRadii0.current[i] * (1 - spiralP * 0.97);
           const y = vYs0.current[i]    * (1 - spiralP);
-          arr[i*3]   = Math.cos(vAngles.current[i]) * r;
-          arr[i*3+1] = y;
-          arr[i*3+2] = Math.sin(vAngles.current[i]) * r;
+          arr[i*3]=Math.cos(vAngles.current[i])*r;
+          arr[i*3+1]=y;
+          arr[i*3+2]=Math.sin(vAngles.current[i])*r;
         }
         vortexRef.current.geometry.attributes.position.needsUpdate = true;
-
-        /* fade in then fade out as core brightens */
         const fadeIn  = smooth(clamp01((t - T.reveal + 0.1) / 1.2));
         const fadeOut = t > T.freeze - 1.5 ? smooth((t - (T.freeze - 1.5)) / 1.5) : 0;
         if (vortexMat.current) vortexMat.current.opacity = fadeIn * (1 - fadeOut) * 0.8;
@@ -184,22 +167,18 @@ function Sequence() {
         if (coreLight.current) coreLight.current.intensity = cp * 8;
       }
 
-      /* camera: overhead angle → straight-on zoom */
-      let camZ, camY;
-      if (t < T.spiral) {
-        const p = smooth(t / T.spiral);
-        camZ = lerp(20, 13, p);
-        camY = lerp(5, 2, p);
-      } else {
-        const p = smooth((t - T.spiral) / (T.freeze - T.spiral));
-        camZ = lerp(13, 8.5, p);
-        camY = lerp(2, 0.3, p);
-      }
+      /* camera zoom toward center */
+      const camZ = t < T.spiral
+        ? lerp(20, 13, smooth(t / T.spiral))
+        : lerp(13, 8.5, smooth((t - T.spiral) / (T.freeze - T.spiral)));
+      const camY = t < T.spiral
+        ? lerp(5, 2, smooth(t / T.spiral))
+        : lerp(2, 0.3, smooth((t - T.spiral) / (T.freeze - T.spiral)));
       camera.position.set(0, camY, camZ);
       camera.lookAt(0, 0, 0);
 
     } else {
-      /* ---- post-explosion phase ---- */
+      /* post-explosion */
       if (vortexRef.current) vortexRef.current.visible = false;
       if (coreRef.current)   coreRef.current.visible   = false;
       if (coreLight.current) coreLight.current.intensity = 0;
@@ -207,10 +186,13 @@ function Sequence() {
 
       const arr = points.current.geometry.attributes.position.array;
       const tt  = t - T.freeze;
-      const dAssemble = T.assemble - T.freeze;
-      const dLift     = T.lift - T.assemble;
+      const dAssemble = T.assemble - T.freeze; // 2.5s
+      const dLift     = T.lift    - T.assemble; // 1.2s
+      const dExpand   = T.expand  - T.lift;     // 1.5s
+      const dSettle   = T.settle  - T.expand;   // 2.8s
 
       if (tt < dAssemble) {
+        /* scattered → HK */
         const a     = smooth(tt / dAssemble);
         const bulge = Math.sin(a * Math.PI) * 3.0;
         for (let i = 0; i < N; i++) {
@@ -218,23 +200,38 @@ function Sequence() {
           arr[i*3+1] = lerp(origins[i*3+1], hkTargets[i*3+1], a) + dirs[i*3+1] * bulge;
           arr[i*3+2] = lerp(origins[i*3+2], hkTargets[i*3+2], a) + dirs[i*3+2] * bulge;
         }
+        liftY = 0;
       } else if (tt < dAssemble + dLift) {
-        liftY = smooth((tt - dAssemble) / dLift) * 1.6;
+        /* HK holds, moves up */
+        liftY = smooth((tt - dAssemble) / dLift) * 1.2;
         for (let i = 0; i < N; i++) {
           arr[i*3]=hkTargets[i*3]; arr[i*3+1]=hkTargets[i*3+1]; arr[i*3+2]=hkTargets[i*3+2];
+        }
+      } else if (tt < dAssemble + dLift + dExpand) {
+        /* HK → Hemanth Kata: particles flow from lifted HK to centered name */
+        const a = smooth((tt - dAssemble - dLift) / dExpand);
+        liftY = lerp(1.2, 0, a); // descend back to center as name expands
+        for (let i = 0; i < N; i++) {
+          arr[i*3]   = lerp(hkTargets[i*3],   nameTargets[i*3],   a);
+          arr[i*3+1] = lerp(hkTargets[i*3+1], nameTargets[i*3+1], a);
+          arr[i*3+2] = lerp(hkTargets[i*3+2], nameTargets[i*3+2], a);
         }
       } else {
-        liftY = 1.6;
+        /* Hemanth Kata holds */
+        liftY = 0;
         for (let i = 0; i < N; i++) {
-          arr[i*3]=hkTargets[i*3]; arr[i*3+1]=hkTargets[i*3+1]; arr[i*3+2]=hkTargets[i*3+2];
+          arr[i*3]=nameTargets[i*3]; arr[i*3+1]=nameTargets[i*3+1]; arr[i*3+2]=nameTargets[i*3+2];
         }
-        if (points.current.material)
-          points.current.material.opacity = 1 - smooth((tt - dAssemble - dLift) / 0.8);
       }
       points.current.geometry.attributes.position.needsUpdate = true;
 
-      camera.position.set(0, 0.6, 9.5);
-      camera.lookAt(0, 0.7, 0);
+      /* camera: tight on HK → zoom out for full name */
+      const nameFrac = tt < dAssemble + dLift ? 0
+        : tt < dAssemble + dLift + dExpand
+          ? smooth((tt - dAssemble - dLift) / dExpand) : 1;
+      const camZ = lerp(9.5, 14, nameFrac);
+      camera.position.set(0, 0.6, camZ);
+      camera.lookAt(0, liftY + 0.3, 0);
     }
 
     if (points.current) {
@@ -246,12 +243,12 @@ function Sequence() {
   return (
     <group>
       <ambientLight intensity={0.08} />
-      <pointLight ref={coreLight} position={[0, 0, 0]} intensity={0} color="#88aaff" distance={25} />
+      <pointLight ref={coreLight} position={[0,0,0]} intensity={0} color="#88aaff" distance={25} />
 
       {/* stars */}
       <points>
         <bufferGeometry>
-          <bufferAttribute attach="attributes-position" array={starPositions} count={starPositions.length / 3} itemSize={3} />
+          <bufferAttribute attach="attributes-position" array={starPositions} count={starPositions.length/3} itemSize={3} />
         </bufferGeometry>
         <pointsMaterial ref={starsMat} size={0.06} color="#ffffff" sizeAttenuation transparent opacity={0} depthWrite={false} />
       </points>
@@ -270,12 +267,12 @@ function Sequence() {
         <meshStandardMaterial ref={coreMat} color="#ffffff" emissive="#7ab0ff" emissiveIntensity={0} />
       </mesh>
 
-      {/* HK particles */}
+      {/* HK → Hemanth Kata particles */}
       <points ref={points} visible={false}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" array={positions} count={N} itemSize={3} />
         </bufferGeometry>
-        <pointsMaterial size={0.06} color="#cfeaff" sizeAttenuation transparent opacity={1} depthWrite={false} blending={THREE.AdditiveBlending} />
+        <pointsMaterial size={0.055} color="#cfeaff" sizeAttenuation transparent opacity={1} depthWrite={false} blending={THREE.AdditiveBlending} />
       </points>
 
       <EffectComposer>
@@ -285,12 +282,11 @@ function Sequence() {
   );
 }
 
-/* ---------- main overlay ---------- */
+/* ---------- overlay UI ---------- */
 export default function CinematicIntro() {
-  const [mounted, setMounted] = useState(false);
+  const [mounted,  setMounted]  = useState(false);
   const [showHero, setShowHero] = useState(false);
-  const [stage, setStage] = useState(0);
-  const [done, setDone] = useState(false);
+  const [done,     setDone]     = useState(false);
 
   const finishIntro = () => {
     setDone(true);
@@ -300,12 +296,10 @@ export default function CinematicIntro() {
   useEffect(() => {
     setMounted(true);
     document.documentElement.classList.remove("intro-playing");
-    const base = T.lift * 1000;
+    const base = T.settle * 1000; // after Hemanth Kata is fully formed
     const timers = [
-      setTimeout(() => setShowHero(true), base + 100),
-      setTimeout(() => setStage(1), base + 1000),
-      setTimeout(() => setStage(2), base + 1900),
-      setTimeout(() => finishIntro(), base + 7000),
+      setTimeout(() => setShowHero(true), base + 200),  // subtitle fades in
+      setTimeout(() => finishIntro(),     base + 6500), // auto-dismiss
     ];
     return () => timers.forEach(clearTimeout);
   }, []);
@@ -331,7 +325,7 @@ export default function CinematicIntro() {
               gl={{ antialias: true, alpha: false }}
             >
               <color attach="background" args={["#01030a"]} />
-              <fog attach="fog" args={["#01030a", 15, 55]} />
+              <fog attach="fog" args={["#01030a", 18, 60]} />
               <Sequence />
             </Canvas>
           )}
@@ -345,19 +339,11 @@ export default function CinematicIntro() {
               transition={{ duration: 1 }}
               className="absolute inset-0 z-10 flex flex-col items-center justify-center px-6 text-center"
             >
-              <motion.div
-                initial={{ opacity: 0, y: 20, filter: "blur(8px)" }}
-                animate={{ opacity: 1, y: stage >= 1 ? -44 : 0, filter: "blur(0px)" }}
-                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <NameReveal stage={stage} />
-              </motion.div>
-
               <motion.p
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, delay: 2.4 }}
-                className="mt-2 text-sm uppercase tracking-[0.3em] text-white/70 md:text-lg"
+                transition={{ duration: 0.7, delay: 0.3 }}
+                className="text-sm uppercase tracking-[0.3em] text-white/70 md:text-lg"
               >
                 Full Stack Developer · Cloud Engineer · Problem Solver
               </motion.p>
@@ -365,7 +351,7 @@ export default function CinematicIntro() {
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.7, delay: 2.7 }}
+                transition={{ duration: 0.7, delay: 0.6 }}
                 className="mt-6 max-w-xl text-sm leading-relaxed text-muted md:text-base"
               >
                 Building scalable applications, crafting digital experiences, and
@@ -375,7 +361,7 @@ export default function CinematicIntro() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, delay: 3.0 }}
+                transition={{ duration: 0.7, delay: 1.0 }}
                 className="mt-10 flex flex-wrap items-center justify-center gap-4"
               >
                 <Link href="/work" className={btn} onClick={finishIntro}>
@@ -392,7 +378,7 @@ export default function CinematicIntro() {
               <motion.button
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 3.4 }}
+                transition={{ delay: 1.5 }}
                 onClick={finishIntro}
                 className="mt-12 text-xs uppercase tracking-[0.25em] text-white/40 transition-colors hover:text-white"
               >
