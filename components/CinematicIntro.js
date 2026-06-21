@@ -457,6 +457,12 @@ export default function CinematicIntro() {
   const [stage, setStage] = useState(0); // 0: HK · 1: split apart · 2: Hemanth Kata
   const [done, setDone] = useState(false);
 
+  const finishIntro = () => {
+    setDone(true);
+    sessionStorage.setItem("intro-done", "1");
+    window.dispatchEvent(new Event("intro-done"));
+  };
+
   useEffect(() => {
     setMounted(true);
     const base = T.lift * 1000; // after the particle HK has lifted
@@ -464,7 +470,7 @@ export default function CinematicIntro() {
       setTimeout(() => setShowHero(true), base + 100), // font HK appears as particles fade
       setTimeout(() => setStage(1), base + 1000), // HK splits apart
       setTimeout(() => setStage(2), base + 1900), // reveal "Hemanth Kata"
-      setTimeout(() => setDone(true), base + 7000),
+      setTimeout(() => finishIntro(), base + 7000),
     ];
     return () => timers.forEach(clearTimeout);
   }, []);
@@ -538,13 +544,13 @@ export default function CinematicIntro() {
                 transition={{ duration: 0.7, delay: 3.0 }}
                 className="mt-10 flex flex-wrap items-center justify-center gap-4"
               >
-                <Link href="/work" className={btn} onClick={() => setDone(true)}>
+                <Link href="/work" className={btn} onClick={finishIntro}>
                   View Projects
                 </Link>
                 <a href="/resume/Hemanth_Kata_Python.pdf" download className={btn}>
                   Download Resume
                 </a>
-                <Link href="/contact" className={btn} onClick={() => setDone(true)}>
+                <Link href="/contact" className={btn} onClick={finishIntro}>
                   Contact Me
                 </Link>
               </motion.div>
@@ -553,7 +559,7 @@ export default function CinematicIntro() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 3.4 }}
-                onClick={() => setDone(true)}
+                onClick={finishIntro}
                 className="mt-12 text-xs uppercase tracking-[0.25em] text-white/40 transition-colors hover:text-white"
               >
                 Enter site ↓
@@ -564,7 +570,7 @@ export default function CinematicIntro() {
 
         {!showHero && (
           <button
-            onClick={() => setDone(true)}
+            onClick={finishIntro}
             className="absolute bottom-6 right-6 z-20 text-xs uppercase tracking-[0.25em] text-white/50 transition-colors hover:text-white"
           >
             Skip intro →

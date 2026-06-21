@@ -9,6 +9,7 @@ import { navLinks, profile } from "../lib/data";
 export default function Nav() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [visible, setVisible] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -21,6 +22,21 @@ export default function Nav() {
     setOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    if (pathname !== "/") {
+      setVisible(true);
+      return;
+    }
+    const seen = sessionStorage.getItem("intro-done");
+    if (seen) {
+      setVisible(true);
+      return;
+    }
+    const handler = () => setVisible(true);
+    window.addEventListener("intro-done", handler);
+    return () => window.removeEventListener("intro-done", handler);
+  }, [pathname]);
+
   const isActive = (href) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
@@ -30,7 +46,7 @@ export default function Nav() {
         scrolled || open
           ? "bg-bg/80 backdrop-blur-md border-b border-line"
           : "border-b border-transparent"
-      }`}
+      } ${visible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
     >
       <nav className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-5">
         <Link href="/" className="justify-self-start text-sm font-bold tracking-widest uppercase">
