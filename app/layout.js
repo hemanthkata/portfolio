@@ -13,6 +13,9 @@ const inter = Inter({
 });
 
 export const metadata = {
+  icons: {
+    icon: "/favicon.svg",
+  },
   title: "Hemanth Kata — Full Stack Developer",
   description:
     "Hemanth Naga Venkata Sai Kata — Full Stack Developer specialising in Python/FastAPI, Odoo ERP, and Java/Spring Boot. Building scalable, production-grade web applications.",
