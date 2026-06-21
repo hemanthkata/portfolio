@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+body {
+  background: #050505;
+  color: #ededed;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Lenis smooth scroll — required styles */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+::selection {
+  background: #e8ff63;
+  color: #000;
+}
+
+/* subtle grain / vignette */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+.text-stroke {
+  -webkit-text-stroke: 1px #2a2a2a;
+  color: transparent;
+}
+
+/* entrance that ends at transform:none so it never breaks mix-blend-mode */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: none; }
+}
+.rise-in { animation: riseIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.rise-in-2 { animation: riseIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both; }
+.rise-in-3 { animation: riseIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both; }
+
+/* hero background option animations */
+@keyframes auroraMove {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(8%, -6%) scale(1.2); }
+  66% { transform: translate(-6%, 8%) scale(0.9); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes gridMove {
+  from { background-position: 0 0; }
+  to { background-position: 0 50px; }
+}
+@keyframes spinSlow {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+@keyframes binaryFall {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(100%); }
+}
+@keyframes neonPulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+@keyframes gridPan {
+  from { background-position: 0 0; }
+  to { background-position: 0 60px; }
+}
+@keyframes orbitSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* custom scrollbar */
+::-webkit-scrollbar { width: 9px; }
+::-webkit-scrollbar-track { background: #050505; }
+::-webkit-scrollbar-thumb { background: #222; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #333; }
