@@ -34,6 +34,14 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={inter.variable}>
+      <head>
+        {/* Blocking script: hide nav + black body before React hydrates on home page */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if(window.location.pathname==='/'){document.documentElement.classList.add('intro-playing');}`,
+          }}
+        />
+      </head>
       <body className="bg-bg font-sans">
         <Cursor />
         <ScrollProgress />

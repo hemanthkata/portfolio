@@ -86,6 +86,16 @@ html.lenis body {
   to { transform: rotate(360deg); }
 }
 
+/* hide nav + black page before intro hydrates */
+html.intro-playing header {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+html.intro-playing body {
+  background: #000 !important;
+  overflow: hidden;
+}
+
 /* custom scrollbar */
 ::-webkit-scrollbar { width: 9px; }
 ::-webkit-scrollbar-track { background: #050505; }

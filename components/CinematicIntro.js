@@ -459,12 +459,13 @@ export default function CinematicIntro() {
 
   const finishIntro = () => {
     setDone(true);
-    sessionStorage.setItem("intro-done", "1");
     window.dispatchEvent(new Event("intro-done"));
   };
 
   useEffect(() => {
     setMounted(true);
+    // Remove CSS class — intro overlay takes over from here
+    document.documentElement.classList.remove("intro-playing");
     const base = T.lift * 1000; // after the particle HK has lifted
     const timers = [
       setTimeout(() => setShowHero(true), base + 100), // font HK appears as particles fade

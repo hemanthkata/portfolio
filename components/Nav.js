@@ -27,11 +27,6 @@ export default function Nav() {
       setVisible(true);
       return;
     }
-    const seen = sessionStorage.getItem("intro-done");
-    if (seen) {
-      setVisible(true);
-      return;
-    }
     const handler = () => setVisible(true);
     window.addEventListener("intro-done", handler);
     return () => window.removeEventListener("intro-done", handler);
