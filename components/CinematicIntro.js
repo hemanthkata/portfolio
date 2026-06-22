@@ -210,7 +210,7 @@ function Sequence() {
       } else if (tt < dAssemble + dLift + dExpand) {
         /* HK → Hemanth Kata: particles flow from lifted HK to centered name */
         const a = smooth((tt - dAssemble - dLift) / dExpand);
-        liftY = lerp(1.2, 0, a); // descend back to center as name expands
+        liftY = lerp(1.2, 1.0, a); // settle slightly above center so name clears UI
         for (let i = 0; i < N; i++) {
           arr[i*3]   = lerp(hkTargets[i*3],   nameTargets[i*3],   a);
           arr[i*3+1] = lerp(hkTargets[i*3+1], nameTargets[i*3+1], a);
@@ -218,7 +218,7 @@ function Sequence() {
         }
       } else {
         /* Hemanth Kata holds */
-        liftY = 0;
+        liftY = 1.0;
         for (let i = 0; i < N; i++) {
           arr[i*3]=nameTargets[i*3]; arr[i*3+1]=nameTargets[i*3+1]; arr[i*3+2]=nameTargets[i*3+2];
         }
@@ -230,7 +230,7 @@ function Sequence() {
         : tt < dAssemble + dLift + dExpand
           ? smooth((tt - dAssemble - dLift) / dExpand) : 1;
       const camZ = lerp(9.5, 14, nameFrac);
-      camera.position.set(0, 0.6, camZ);
+      camera.position.set(0, 1.2, camZ);
       camera.lookAt(0, liftY + 0.3, 0);
     }
 
@@ -337,7 +337,7 @@ export default function CinematicIntro() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 1 }}
-              className="absolute inset-0 z-10 flex flex-col items-center justify-center px-6 text-center"
+              className="absolute inset-0 z-10 flex flex-col items-center justify-end pb-20 px-6 text-center"
             >
               <motion.p
                 initial={{ opacity: 0, y: 16 }}
