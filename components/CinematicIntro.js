@@ -12,10 +12,8 @@ const T = {
   reveal:   2.0,  // stars + vortex fade in
   spiral:   3.5,  // vortex accelerates inward
   freeze:   8.0,  // singularity explodes
-  assemble: 10.5, // particles form HK
-  lift:     11.7, // HK lifts up
-  expand:   13.2, // HK particles split → Hemanth Kata
-  settle:   16.0, // name fully formed
+  assemble: 11.5, // particles form Hemanth Kata
+  settle:   15.0, // name fully formed
 };
 
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
@@ -77,10 +75,11 @@ function Sequence() {
   const N = 5000;
   const V = 3500;
 
-  /* particle geometry + both text targets */
-  const { positions, origins, dirs, hkTargets, nameTargets } = useMemo(() => {
-    const hkTargets   = sampleTextTargets("HK", N, 3.6);
+  /* particle geometry + name targets */
+  const { positions, origins, dirs, nameTargets } = useMemo(() => {
     const nameTargets = sampleTextTargets("Hemanth Kata", N, 8.5);
+    // shift name into upper portion of screen
+    for (let i = 0; i < N; i++) nameTargets[i * 3 + 1] += 1.2;
     const positions   = new Float32Array(N * 3);
     const origins     = new Float32Array(N * 3);
     const dirs        = new Float32Array(N * 3);
@@ -94,7 +93,7 @@ function Sequence() {
       origins[i*3]=dv.x*0.4; origins[i*3+1]=dv.y*0.4; origins[i*3+2]=dv.z*0.4;
       positions[i*3]=origins[i*3]; positions[i*3+1]=origins[i*3+1]; positions[i*3+2]=origins[i*3+2];
     }
-    return { positions, origins, dirs, hkTargets, nameTargets };
+    return { positions, origins, dirs, nameTargets };
   }, []);
 
   /* galaxy vortex */
@@ -135,8 +134,6 @@ function Sequence() {
     const et = state.clock.elapsedTime;
 
     if (starsMat.current) starsMat.current.opacity = smooth(t / T.reveal) * 0.85;
-
-    let liftY = 0;
 
     if (t < T.freeze) {
       /* vortex spin + inward collapse */
@@ -186,57 +183,33 @@ function Sequence() {
 
       const arr = points.current.geometry.attributes.position.array;
       const tt  = t - T.freeze;
-      const dAssemble = T.assemble - T.freeze; // 2.5s
-      const dLift     = T.lift    - T.assemble; // 1.2s
-      const dExpand   = T.expand  - T.lift;     // 1.5s
-      const dSettle   = T.settle  - T.expand;   // 2.8s
+      const dAssemble = T.assemble - T.freeze; // 3.5s — scattered → Hemanth Kata
 
       if (tt < dAssemble) {
-        /* scattered → HK */
+        /* scattered → Hemanth Kata */
         const a     = smooth(tt / dAssemble);
         const bulge = Math.sin(a * Math.PI) * 3.0;
         for (let i = 0; i < N; i++) {
-          arr[i*3]   = lerp(origins[i*3],   hkTargets[i*3],   a) + dirs[i*3]   * bulge;
-          arr[i*3+1] = lerp(origins[i*3+1], hkTargets[i*3+1], a) + dirs[i*3+1] * bulge;
-          arr[i*3+2] = lerp(origins[i*3+2], hkTargets[i*3+2], a) + dirs[i*3+2] * bulge;
-        }
-        liftY = 0;
-      } else if (tt < dAssemble + dLift) {
-        /* HK holds, moves up */
-        liftY = smooth((tt - dAssemble) / dLift) * 1.2;
-        for (let i = 0; i < N; i++) {
-          arr[i*3]=hkTargets[i*3]; arr[i*3+1]=hkTargets[i*3+1]; arr[i*3+2]=hkTargets[i*3+2];
-        }
-      } else if (tt < dAssemble + dLift + dExpand) {
-        /* HK → Hemanth Kata: particles flow from lifted HK to centered name */
-        const a = smooth((tt - dAssemble - dLift) / dExpand);
-        liftY = lerp(1.2, 1.0, a); // settle slightly above center so name clears UI
-        for (let i = 0; i < N; i++) {
-          arr[i*3]   = lerp(hkTargets[i*3],   nameTargets[i*3],   a);
-          arr[i*3+1] = lerp(hkTargets[i*3+1], nameTargets[i*3+1], a);
-          arr[i*3+2] = lerp(hkTargets[i*3+2], nameTargets[i*3+2], a);
+          arr[i*3]   = lerp(origins[i*3],   nameTargets[i*3],   a) + dirs[i*3]   * bulge;
+          arr[i*3+1] = lerp(origins[i*3+1], nameTargets[i*3+1], a) + dirs[i*3+1] * bulge;
+          arr[i*3+2] = lerp(origins[i*3+2], nameTargets[i*3+2], a) + dirs[i*3+2] * bulge;
         }
       } else {
         /* Hemanth Kata holds */
-        liftY = 1.0;
         for (let i = 0; i < N; i++) {
           arr[i*3]=nameTargets[i*3]; arr[i*3+1]=nameTargets[i*3+1]; arr[i*3+2]=nameTargets[i*3+2];
         }
       }
       points.current.geometry.attributes.position.needsUpdate = true;
 
-      /* camera: tight on HK → zoom out for full name */
-      const nameFrac = tt < dAssemble + dLift ? 0
-        : tt < dAssemble + dLift + dExpand
-          ? smooth((tt - dAssemble - dLift) / dExpand) : 1;
-      const camZ = lerp(9.5, 14, nameFrac);
-      camera.position.set(0, 1.2, camZ);
-      camera.lookAt(0, liftY + 0.3, 0);
+      /* camera: name at top, buttons space at bottom */
+      camera.position.set(0, 0.5, 13);
+      camera.lookAt(0, -0.5, 0);
     }
 
     if (points.current) {
       points.current.visible = exploded.current;
-      points.current.position.set(0, liftY, 0);
+      points.current.position.set(0, 0, 0);
     }
   });
 
@@ -337,7 +310,7 @@ export default function CinematicIntro() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 1 }}
-              className="absolute inset-0 z-10 flex flex-col items-center justify-end pb-20 px-6 text-center"
+              className="absolute inset-0 z-10 flex flex-col items-center justify-center pt-[26vh] px-6 text-center"
             >
               <motion.p
                 initial={{ opacity: 0, y: 16 }}
